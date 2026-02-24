@@ -14,6 +14,7 @@ import {
     melhorarComIA,
     gerarScriptEtapa,
     isEvolutionConfigurado,
+    isMetaConfigurado,
     isGroqConfigurado,
 } from '../services/mensagemService.js';
 import { DOCS_POR_BENEFICIO } from './atendentePage.js';
@@ -73,6 +74,9 @@ function gerarTextoInicial(etapaId) {
 
 /* ─── Templates ──────────────────────────────────────────── */
 function tplCanalBadge() {
+    if (isMetaConfigurado()) {
+        return `<span class="canal-badge canal-meta">📱 Meta WhatsApp API — envio direto</span>`;
+    }
     if (isEvolutionConfigurado()) {
         return `<span class="canal-badge canal-evolution">⚡ Evolution API — envio direto</span>`;
     }
