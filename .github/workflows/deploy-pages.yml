@@ -34,6 +34,11 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_WHATSAPP_NUMBER: ${{ secrets.VITE_WHATSAPP_NUMBER }}
+          VITE_ADMIN_PASSWORD: ${{ secrets.VITE_ADMIN_PASSWORD }}
+          VITE_GROQ_API_KEY: ${{ secrets.VITE_GROQ_API_KEY }}
+          VITE_EVOLUTION_API_URL: ${{ secrets.VITE_EVOLUTION_API_URL }}
+          VITE_EVOLUTION_API_KEY: ${{ secrets.VITE_EVOLUTION_API_KEY }}
+          VITE_EVOLUTION_INSTANCE: ${{ secrets.VITE_EVOLUTION_INSTANCE }}
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4

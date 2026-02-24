@@ -76,17 +76,19 @@ export async function saveLead(leadData) {
         throw new Error('Supabase não configurado.');
     }
 
-    const { data, error } = await supabase
+    console.log('[INSS] Enviando lead ao Supabase:', JSON.stringify(leadData, null, 2));
+
+    const { error } = await supabase
         .from('leads')
-        .insert([leadData])
-        .select('id, created_at')
-        .single();
+        .insert([leadData]);
 
     if (error) {
-        throw new Error('Não foi possível salvar o lead. Revise as políticas no Supabase.');
+        console.error('[INSS] Erro Supabase:', error);
+        throw new Error(`Não foi possível salvar o lead: ${error.message}`);
     }
 
-    return data;
+    console.log('[INSS] Lead salvo com sucesso!');
+    return { id: null };
 }
 
 export function buildWhatsAppMessage({ nome, beneficio, situacao, classificacao, protocolo }) {

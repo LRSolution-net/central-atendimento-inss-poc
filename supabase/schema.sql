@@ -33,5 +33,14 @@ create policy leads_insert_anon
   to anon
   with check (consentimento = true);
 
--- Confirma que anon pode fazer insert via API
+-- Permite SELECT pelo usuario anonimo (necessario para ler o lead recem inserido)
+create policy leads_select_anon
+  on public.leads
+  for select
+  to anon
+  using (true);
+
+-- Confirma que anon pode fazer insert e select via API
+grant usage  on schema public to anon;
 grant insert on public.leads to anon;
+grant select on public.leads to anon;

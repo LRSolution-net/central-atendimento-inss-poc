@@ -127,6 +127,7 @@ async function handleSubmit(event) {
             window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
         }, 450);
     } catch (error) {
+        console.error('[INSS] Erro ao salvar lead:', error);
         state.erro = error.message || 'Não foi possível concluir a triagem.';
     } finally {
         state.carregando = false;
