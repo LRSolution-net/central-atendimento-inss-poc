@@ -1,0 +1,25 @@
+{
+  "name": "central-atendimento-inss-poc",
+  "version": "1.0.0",
+  "description": "Central de Atendimento via WhatsApp para escritório de advocacia especializado em INSS.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4"
+  },
+  "devDependencies": {
+    "vite": "^5.4.14"
+  },
+  "keywords": [
+    "whatsapp",
+    "atendimento",
+    "inss",
+    "advocacia"
+  ],
+  "author": "Seu Nome",
+  "license": "MIT"
+}
