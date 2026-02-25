@@ -15,7 +15,7 @@
   "devDependencies": {
     "gh-pages": "^6.3.0",
     "supabase": "^2.76.14",
-    "vite": "^5.4.14"
+    "vite": "^7.3.1"
   },
   "keywords": [
     "whatsapp",
