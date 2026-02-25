@@ -1,4 +1,4 @@
-import{s as b,i as S}from"./supabase-DBx6agDF.js";function E(){return`
+import{s as b,i as S}from"./supabase-DSqML6--.js";function E(){return`
         <form id="triagem-form">
             <input class="honeypot" type="text" name="website" autocomplete="off" tabindex="-1" />
 
