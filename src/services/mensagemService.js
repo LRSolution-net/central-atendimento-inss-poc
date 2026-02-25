@@ -9,7 +9,10 @@
    - Groq API via Edge Function proxy (resolve CORS do navegador)
 ================================================================ */
 
+import { abrirWhatsAppWebModal } from '../components/whatsappWebModal.js';
+
 const SUPABASE_URL        = import.meta.env.VITE_SUPABASE_URL       || '';
+const SUPABASE_ANON_KEY   = import.meta.env.VITE_SUPABASE_ANON_KEY  || '';
 const EVOLUTION_URL       = import.meta.env.VITE_EVOLUTION_API_URL   || '';
 const EVOLUTION_KEY       = import.meta.env.VITE_EVOLUTION_API_KEY   || '';
 const EVOLUTION_INSTANCE  = import.meta.env.VITE_EVOLUTION_INSTANCE  || '';
@@ -36,7 +39,10 @@ export async function enviarViaMeta(numero, mensagem) {
     const url = `${SUPABASE_URL}/functions/v1/meta-whatsapp`;
     const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
         body: JSON.stringify({ numero, mensagem }),
     });
     const data = await res.json();
@@ -63,25 +69,52 @@ export async function enviarViaEvolution(numero, mensagem) {
     return await res.json();
 }
 
-/* ─── Fallback wa.me ─────────────────────────────────────── */
+/* ─── Fallback wa.me (via modal interno) ───────────────── */
 export function enviarViaWaMe(numero, mensagem) {
-    const digits = String(numero).replace(/\D/g, '');
-    window.open(
-        `https://wa.me/${digits}?text=${encodeURIComponent(mensagem)}`,
-        '_blank', 'noopener,noreferrer',
-    );
+    try {
+        const digits = String(numero).replace(/\D/g, '');
+        
+        if (!digits || digits.length < 10) {
+            throw new Error('Número de WhatsApp inválido');
+        }
+        
+        // Garante código do país (55 para Brasil)
+        const numeroCompleto = digits.startsWith('55') ? digits : `55${digits}`;
+        
+        // Abre modal com WhatsApp Web integrado (sem popup)
+        abrirWhatsAppWebModal(numeroCompleto, mensagem);
+        
+    } catch (err) {
+        console.error('Erro ao abrir WhatsApp:', err);
+        alert(`❌ Erro ao abrir WhatsApp: ${err.message}`);
+        throw err;
+    }
 }
 
 /* ─── Envio unificado (Meta → Evolution → wa.me) ────────── */
 export async function enviarMensagem(numero, mensagem) {
+    // Tenta Meta primeiro
     if (isMetaConfigurado()) {
-        await enviarViaMeta(numero, mensagem);
-        return { canal: 'meta' };
+        try {
+            await enviarViaMeta(numero, mensagem);
+            return { canal: 'meta' };
+        } catch (erro) {
+            // Se erro for "número não cadastrado", faz fallback para wa.me
+            if (erro.message?.includes('131030') || erro.message?.includes('not in allowed list')) {
+                console.warn('⚠️ Número não cadastrado na Meta, usando wa.me como fallback');
+                enviarViaWaMe(numero, mensagem);
+                return { canal: 'wame-fallback' };
+            }
+            // Outros erros, repassa
+            throw erro;
+        }
     }
+    // Se Meta não configurado, tenta Evolution
     if (isEvolutionConfigurado()) {
         await enviarViaEvolution(numero, mensagem);
         return { canal: 'evolution' };
     }
+    // Fallback final: wa.me
     enviarViaWaMe(numero, mensagem);
     return { canal: 'wame' };
 }

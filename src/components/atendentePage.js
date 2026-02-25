@@ -1,7 +1,8 @@
-import { buscarLeads, atualizarStatusLead } from '../services/leadsAdminService.js';
+import { buscarLeads, atualizarStatusLead, atualizarNomeLead, deletarLead } from '../services/leadsAdminService.js';
 import { salvarAtendimento } from '../services/atendimentosService.js';
 import { logout } from '../services/authService.js';
 import { abrirConversaModal } from './conversaModal.js';
+import { abrirModalEdicao } from './editarLeadModal.js';
 
 export const DOCS_POR_BENEFICIO = {
     'aposentadoria': [
@@ -57,6 +58,11 @@ const state = {
     loading: false,
     erro: '',
     filtroStatus: 'novo',
+    filtroBeneficio: '',
+    filtroClassificacao: '',
+    busca: '',
+    ordenacao: 'created_at',
+    ordem: 'desc',
     modal: null, // { lead }
 };
 
@@ -80,10 +86,55 @@ function chipClass(c) {
 }
 
 function getFiltered() {
-    return state.leads.filter(l => {
+    let filtered = state.leads.filter(l => {
+        // Filtro por status
         if (state.filtroStatus && l.status_atendimento !== state.filtroStatus) return false;
+        
+        // Filtro por benefício
+        if (state.filtroBeneficio && l.beneficio !== state.filtroBeneficio) return false;
+        
+        // Filtro por classificação
+        if (state.filtroClassificacao && l.classificacao !== state.filtroClassificacao) return false;
+        
+        // Busca por nome ou whatsapp
+        if (state.busca) {
+            const termo = state.busca.toLowerCase();
+            const nome = (l.nome || '').toLowerCase();
+            const wpp = (l.whatsapp || '').replace(/\D/g, '');
+            const buscaLimpa = termo.replace(/\D/g, '');
+            if (!nome.includes(termo) && !wpp.includes(buscaLimpa)) return false;
+        }
+        
         return true;
     });
+    
+    // Ordenação
+    filtered.sort((a, b) => {
+        let valA, valB;
+        
+        switch (state.ordenacao) {
+            case 'nome':
+                valA = (a.nome || '').toLowerCase();
+                valB = (b.nome || '').toLowerCase();
+                break;
+            case 'classificacao':
+                const ordem = { 'Alta': 3, 'Média': 2, 'Baixa': 1 };
+                valA = ordem[a.classificacao] || 0;
+                valB = ordem[b.classificacao] || 0;
+                break;
+            case 'created_at':
+            default:
+                valA = new Date(a.created_at || 0).getTime();
+                valB = new Date(b.created_at || 0).getTime();
+                break;
+        }
+        
+        if (valA < valB) return state.ordem === 'asc' ? -1 : 1;
+        if (valA > valB) return state.ordem === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    return filtered;
 }
 
 /* ─── Templates ──────────────────────────────────────────── */
@@ -102,26 +153,66 @@ function tplHeader() {
 }
 
 function tplFiltros() {
-    const opts = [
+    const optsStatus = [
         ['novo', 'Novos'],
         ['em-contato', 'Em contato'],
         ['qualificado', 'Qualificado'],
         ['', 'Todos'],
     ];
+    
     return `
         <div class="ad-filtros">
-            ${opts.map(([v, l]) =>
-                `<button class="tab-pill ${state.filtroStatus === v ? 'tab-pill-active' : ''}"
-                    data-status="${v}">${l}</button>`
-            ).join('')}
-            <button id="btn-refresh" class="btn-outline" style="margin-left:auto">↻ Atualizar</button>
+            <!-- Filtros de Status -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                ${optsStatus.map(([v, l]) =>
+                    `<button class="tab-pill ${state.filtroStatus === v ? 'tab-pill-active' : ''}"
+                        data-status="${v}">${l}</button>`
+                ).join('')}
+            </div>
+            
+            <!-- Busca -->
+            <input 
+                type="text" 
+                id="input-busca" 
+                class="ad-select" 
+                placeholder="🔍 Buscar por nome ou WhatsApp..."
+                value="${state.busca}"
+                style="flex:1;min-width:200px">
+            
+            <!-- Filtro Benefício -->
+            <select id="select-beneficio" class="ad-select">
+                <option value="">📋 Todos os benefícios</option>
+                <option value="aposentadoria" ${state.filtroBeneficio === 'aposentadoria' ? 'selected' : ''}>Aposentadoria</option>
+                <option value="auxilio-doenca" ${state.filtroBeneficio === 'auxilio-doenca' ? 'selected' : ''}>Auxílio-doença</option>
+                <option value="bpc-loas" ${state.filtroBeneficio === 'bpc-loas' ? 'selected' : ''}>BPC/LOAS</option>
+                <option value="beneficio-negado" ${state.filtroBeneficio === 'beneficio-negado' ? 'selected' : ''}>Benefício Negado</option>
+                <option value="outros" ${state.filtroBeneficio === 'outros' ? 'selected' : ''}>Outros</option>
+            </select>
+            
+            <!-- Filtro Classificação -->
+            <select id="select-classificacao" class="ad-select">
+                <option value="">🎯 Todas classificações</option>
+                <option value="Alta" ${state.filtroClassificacao === 'Alta' ? 'selected' : ''}>⚠️ Alta</option>
+                <option value="Média" ${state.filtroClassificacao === 'Média' ? 'selected' : ''}>📊 Média</option>
+                <option value="Baixa" ${state.filtroClassificacao === 'Baixa' ? 'selected' : ''}>📉 Baixa</option>
+            </select>
+            
+            <button id="btn-limpar-filtros" class="btn-outline btn-sm" title="Limpar todos os filtros">✕ Limpar</button>
+            <button id="btn-refresh" class="btn-outline btn-sm">↻ Atualizar</button>
         </div>`;
 }
 
 function tplLeadsComum(leads) {
     if (state.loading) return `<div class="ad-feedback ad-loading">Carregando leads…</div>`;
     if (state.erro)    return `<div class="ad-feedback ad-erro">${state.erro}</div>`;
-    if (!leads.length) return `<div class="ad-feedback ad-vazio">Nenhum lead encontrado.</div>`;
+    if (!leads.length) {
+        const temFiltros = state.busca || state.filtroBeneficio || state.filtroClassificacao || state.filtroStatus;
+        return `<div class="ad-feedback ad-vazio">
+            ${temFiltros 
+                ? '🔍 Nenhum lead encontrado com esses filtros. <button id="btn-limpar-inline" class="btn-outline btn-sm" style="margin-left:8px">Limpar filtros</button>'
+                : 'Nenhum lead encontrado.'}
+        </div>`;
+    }
 
     const rows = leads.map(lead => {
         const benefLabel = BENEFICIO_LABELS[lead.beneficio] || lead.beneficio;
@@ -131,7 +222,7 @@ function tplLeadsComum(leads) {
             <tr>
                 <td>
                     <div class="lead-nome">${lead.nome}</div>
-                    <div class="lead-detalhe">${lead.cidade} · ${lead.idade} anos</div>
+                    <div class="lead-detalhe">${lead.cidade} · ${lead.idade} anos${lead.sexo ? ` · ${lead.sexo === 'masculino' ? 'M' : lead.sexo === 'feminino' ? 'F' : ''}` : ''}</div>
                     ${lead.observacoes ? `<div class="lead-obs">${lead.observacoes}</div>` : ''}
                 </td>
                 <td>
@@ -140,20 +231,28 @@ function tplLeadsComum(leads) {
                         ${lead.whatsapp}
                     </a>
                 </td>
-                <td>${benefLabel}</td>
+                <td>
+                    <div>${benefLabel}</div>
+                    <div class="lead-detalhe">${lead.situacao || ''}</div>
+                </td>
                 <td>${chipClass(lead.classificacao)}</td>
                 <td><span class="badge badge-${lead.status_atendimento}">${lead.status_atendimento.replace('-',' ')}</span></td>
                 <td class="td-data">${formatDate(lead.created_at)}</td>
                 <td>
-                    ${pode ? `
-                        <button class="btn-docs"
-                            data-id="${lead.id}"
-                            data-nome="${lead.nome}"
-                            data-wpp="${stripPlus(lead.whatsapp)}"
-                            data-beneficio="${lead.beneficio}"
-                            data-beneflabel="${benefLabel}">
-                            📄 Solicitar docs
-                        </button>` : '<span class="score-badge">—</span>'}
+                    <div style="display:flex;gap:4px;align-items:center">
+                        ${pode ? `
+                            <button class="btn-docs"
+                                data-id="${lead.id}"
+                                data-nome="${lead.nome}"
+                                data-wpp="${stripPlus(lead.whatsapp)}"
+                                data-beneficio="${lead.beneficio}"
+                                data-beneflabel="${benefLabel}">
+                                📄 Docs
+                            </button>` : '<span class="score-badge">—</span>'}
+                        <button class="btn-icon" data-action="edit-nome" data-id="${lead.id}" data-nome="${lead.nome}" title="Editar dados do lead">
+                            ✏️
+                        </button>
+                    </div>
                 </td>
             </tr>`;
     }).join('');
@@ -161,10 +260,26 @@ function tplLeadsComum(leads) {
     return `
         <div class="table-wrap">
             <table class="leads-table">
-                <thead><tr>
-                    <th>Lead</th><th>WhatsApp</th><th>Benefício</th>
-                    <th>Prioridade</th><th>Status</th><th>Data</th><th>Ação</th>
-                </tr></thead>
+                <thead>
+                    <tr>
+                        <th class="sortable" data-col="nome" title="Clique para ordenar">
+                            Nome / Observações
+                            ${state.ordenacao === 'nome' ? (state.ordem === 'asc' ? ' ↑' : ' ↓') : ''}
+                        </th>
+                        <th>WhatsApp</th>
+                        <th>Benefício / Situação</th>
+                        <th class="sortable" data-col="classificacao" title="Clique para ordenar">
+                            Classificação
+                            ${state.ordenacao === 'classificacao' ? (state.ordem === 'asc' ? ' ↑' : ' ↓') : ''}
+                        </th>
+                        <th>Status</th>
+                        <th class="sortable" data-col="created_at" title="Clique para ordenar">
+                            Data
+                            ${state.ordenacao === 'created_at' ? (state.ordem === 'asc' ? ' ↑' : ' ↓') : ''}
+                        </th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
                 <tbody>${rows}</tbody>
             </table>
         </div>`;
@@ -265,6 +380,7 @@ function rerender() {
 
 /* ─── Events ─────────────────────────────────────────────── */
 function bindTableEvents() {
+    // Botões de solicitar docs
     _container.querySelectorAll('.btn-docs').forEach(btn => {
         btn.addEventListener('click', () => {
             const lead = state.leads.find(l => l.id === btn.dataset.id);
@@ -281,6 +397,11 @@ function bindTableEvents() {
                 onClose: () => rerenderTable(),
             });
         });
+    });
+    
+    // Botões de editar nome
+    _container.querySelectorAll('[data-action="edit-nome"]').forEach(btn => {
+        btn.addEventListener('click', () => handleEditarNome(btn.dataset));
     });
 }
 
@@ -305,7 +426,8 @@ function bindEvents() {
     });
 
     _container.querySelector('#btn-refresh')?.addEventListener('click', loadLeads);
-
+    
+    // Filtros de status
     _container.querySelectorAll('.tab-pill').forEach(btn => {
         btn.addEventListener('click', () => {
             state.filtroStatus = btn.dataset.status;
@@ -315,8 +437,66 @@ function bindEvents() {
             rerenderTable();
         });
     });
+    
+    // Busca
+    const inputBusca = _container.querySelector('#input-busca');
+    if (inputBusca) {
+        inputBusca.addEventListener('input', (e) => {
+            state.busca = e.target.value;
+            rerenderTable();
+        });
+    }
+    
+    // Filtro benefício
+    _container.querySelector('#select-beneficio')?.addEventListener('change', (e) => {
+        state.filtroBeneficio = e.target.value;
+        rerenderTable();
+    });
+    
+    // Filtro classificação
+    _container.querySelector('#select-classificacao')?.addEventListener('change', (e) => {
+        state.filtroClassificacao = e.target.value;
+        rerenderTable();
+    });
+    
+    // Limpar filtros
+    const btnLimpar = _container.querySelector('#btn-limpar-filtros');
+    if (btnLimpar) {
+        btnLimpar.addEventListener('click', () => {
+            state.filtroBeneficio = '';
+            state.filtroClassificacao = '';
+            state.busca = '';
+            state.filtroStatus = 'novo';
+            rerender();
+        });
+    }
+    
+    // Ordenação por coluna
+    _container.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.dataset.col;
+            if (state.ordenacao === col) {
+                state.ordem = state.ordem === 'asc' ? 'desc' : 'asc';
+            } else {
+                state.ordenacao = col;
+                state.ordem = 'desc';
+            }
+            rerenderTable();
+        });
+        th.style.cursor = 'pointer';
+        th.style.userSelect = 'none';
+    });
 
     bindTableEvents();
+    
+    // Limpar filtros inline (quando não há resultados)
+    _container.querySelector('#btn-limpar-inline')?.addEventListener('click', () => {
+        state.filtroBeneficio = '';
+        state.filtroClassificacao = '';
+        state.busca = '';
+        state.filtroStatus = 'novo';
+        rerender();
+    });
 }
 
 /* ─── Handlers ───────────────────────────────────────────── */
@@ -370,6 +550,45 @@ async function handleConfirmarDocs(e) {
         alert(`Erro: ${err.message}`);
         btn.disabled = false;
         btn.textContent = '📲 Enviar por WhatsApp e encaminhar ao especialista';
+    }
+}
+
+async function handleEditarNome({ id }) {
+    const lead = state.leads.find(l => l.id === id);
+    if (!lead) return;
+    
+    abrirModalEdicao({
+        lead,
+        profile: _profile,
+        onSaved: (leadAtualizado) => {
+            const idx = state.leads.findIndex(l => l.id === id);
+            if (idx !== -1) state.leads[idx] = leadAtualizado;
+            rerenderTable();
+        },
+        onClose: () => rerenderTable()
+    });
+}
+
+async function handleDeletarLead({ id }) {
+    const lead = state.leads.find(l => l.id === id);
+    if (!lead) return;
+    
+    if (!confirm(`Tem certeza que deseja excluir o lead "${lead.nome}"?\n\nEsta ação não pode ser desfeita.`)) return;
+    
+    try {
+        await deletarLead(id);
+        
+        state.leads = state.leads.filter(l => l.id !== id);
+        rerenderTable();
+        
+        const toast = document.createElement('div');
+        toast.className = 'toast-success';
+        toast.textContent = 'Lead excluído';
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc2626;color:white;padding:8px 16px;border-radius:6px;z-index:10000;animation:slideIn 0.3s ease-out;font-size:14px';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    } catch (err) {
+        alert(`❌ Erro ao excluir lead: ${err.message}`);
     }
 }
 

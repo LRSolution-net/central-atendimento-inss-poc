@@ -1,6 +1,6 @@
 export function renderAtendimentoForm() {
     return `
-        <form id="triagem-form" novalidate>
+        <form id="triagem-form">
             <input class="honeypot" type="text" name="website" autocomplete="off" tabindex="-1" />
 
             <div class="form-grid">
@@ -22,6 +22,15 @@ export function renderAtendimentoForm() {
                 <div class="field">
                     <label for="idade">Idade</label>
                     <input id="idade" name="idade" type="number" min="16" max="120" required />
+                </div>
+
+                <div class="field">
+                    <label for="sexo">Sexo</label>
+                    <select id="sexo" name="sexo" required>
+                        <option value="">Selecione</option>
+                        <option value="masculino">Masculino</option>
+                        <option value="feminino">Feminino</option>
+                    </select>
                 </div>
 
                 <div class="field">

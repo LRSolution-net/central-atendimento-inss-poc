@@ -138,6 +138,39 @@ button:hover {
     color: #175cd3;
 }
 
+.field-validation {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    animation: slideDown 0.2s ease-out;
+}
+
+.field-validation.validating {
+    background-color: #f3f4f6;
+    border-left: 3px solid #6b7280;
+}
+
+.field-validation.success {
+    background-color: #dcfce7;
+    border-left: 3px solid #16a34a;
+}
+
+.field-validation.error {
+    background-color: #fee2e2;
+    border-left: 3px solid #dc2626;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .resultado {
     margin-top: 18px;
 }

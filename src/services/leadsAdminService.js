@@ -27,3 +27,25 @@ export async function atualizarStatusLead(id, status_atendimento) {
 
     if (error) throw new Error(`Erro ao atualizar lead: ${error.message}`);
 }
+
+export async function atualizarNomeLead(id, nome) {
+    if (!supabase) throw new Error('Supabase não configurado.');
+
+    const { error } = await supabase
+        .from('leads')
+        .update({ nome })
+        .eq('id', id);
+
+    if (error) throw new Error(`Erro ao atualizar nome: ${error.message}`);
+}
+
+export async function deletarLead(id) {
+    if (!supabase) throw new Error('Supabase não configurado.');
+
+    const { error } = await supabase
+        .from('leads')
+        .delete()
+        .eq('id', id);
+
+    if (error) throw new Error(`Erro ao deletar lead: ${error.message}`);
+}

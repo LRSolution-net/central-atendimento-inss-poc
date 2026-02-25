@@ -1,8 +1,9 @@
-import { buscarLeads, atualizarStatusLead } from '../services/leadsAdminService.js';
+import { buscarLeads, atualizarStatusLead, atualizarNomeLead, deletarLead } from '../services/leadsAdminService.js';
 import { salvarAtendimento } from '../services/atendimentosService.js';
 import { logout, createUser } from '../services/authService.js';
 import { listarUsuarios, toggleAtivoUsuario, atualizarRoleUsuario } from '../services/usuariosService.js';
 import { abrirConversaModal } from './conversaModal.js';
+import { abrirModalEdicao } from './editarLeadModal.js';
 
 const BENEFICIO_LABELS = {
     'aposentadoria': 'Aposentadoria', 'auxilio-doenca': 'Auxílio-doença',
@@ -133,7 +134,7 @@ function tplTable(leads) {
             <tr data-id="${lead.id}">
                 <td>
                     <div class="lead-nome">${lead.nome}</div>
-                    <div class="lead-detalhe">${lead.cidade} · ${lead.idade} anos · ${lead.contribuicao_anos} anos contrib.</div>
+                    <div class="lead-detalhe">${lead.cidade} · ${lead.idade} anos · ${lead.contribuicao_anos} anos contrib.${lead.sexo ? ` · ${lead.sexo === 'masculino' ? 'M' : lead.sexo === 'feminino' ? 'F' : ''}` : ''}</div>
                     ${lead.observacoes ? `<div class="lead-obs">${lead.observacoes}</div>` : ''}
                 </td>
                 <td><a class="link-wpp" href="https://wa.me/${wpp}" target="_blank" rel="noopener noreferrer">+${wpp}</a></td>
@@ -154,12 +155,21 @@ function tplTable(leads) {
                 </td>
                 <td class="td-data">${formatDate(lead.created_at)}</td>
                 <td class="td-acoes">
-                    ${canAtend ? `
-                        <button class="btn-atender"
-                            data-id="${lead.id}" data-nome="${lead.nome}" data-wpp="${wpp}"
-                            data-beneflabel="${benefLabel}" data-classificacao="${lead.classificacao}">
-                            📲 Atender
-                        </button>` : statusBadge(lead.status_atendimento)}
+                    <div style="display:flex;gap:4px;align-items:center">
+                        ${canAtend ? `
+                            <button class="btn-atender"
+                                data-id="${lead.id}" data-nome="${lead.nome}" data-wpp="${wpp}"
+                                data-beneflabel="${benefLabel}" data-classificacao="${lead.classificacao}">
+                                📲 Atender
+                            </button>` : statusBadge(lead.status_atendimento)}
+                        <button class="btn-icon" data-action="edit-nome" data-id="${lead.id}" data-nome="${lead.nome}" title="Editar dados do lead">
+                            ✏️
+                        </button>
+                        ${_profile?.role === 'admin' ? `
+                        <button class="btn-icon btn-delete" data-action="delete" data-id="${lead.id}" data-nome="${lead.nome}" title="Excluir lead (somente admin)">
+                            🗑️
+                        </button>` : ''}
+                    </div>
                 </td>
             </tr>`;
     }).join('');
@@ -200,7 +210,7 @@ function tplModalNovoUsuario() {
                     <button class="modal-close" id="modal-user-close">✕</button>
                 </div>
                 ${state.erroNovoUsuario
-                    ? `<div class="ad-feedback ad-erro" style="margin-bottom:12px">${state.erroNovoUsuario}</div>`
+                    ? `<div class="ad-feedback ad-erro" style="margin-bottom:12px;line-height:1.5;white-space:pre-wrap">${state.erroNovoUsuario}</div>`
                     : ''}
                 <form id="form-novo-usuario">
                     <div class="form-row">
@@ -345,6 +355,14 @@ function bindLeadsTableEvents() {
     _container.querySelectorAll('.status-select:not(.role-select)').forEach(sel =>
         sel.addEventListener('change', () => handleStatusChange(sel))
     );
+    // Botões de editar nome
+    _container.querySelectorAll('[data-action="edit-nome"]').forEach(btn => {
+        btn.addEventListener('click', () => handleEditarNome(btn.dataset));
+    });
+    // Botões de deletar
+    _container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+        btn.addEventListener('click', () => handleDeletarLead(btn.dataset));
+    });
 }
 
 function bindUsuariosEvents() {
@@ -425,6 +443,38 @@ async function handleAtender({ id }) {
     });
 }
 
+async function handleEditarNome({ id }) {
+    const lead = state.leads.find(l => l.id === id);
+    if (!lead) return;
+    
+    abrirModalEdicao({
+        lead,
+        profile: _profile,
+        onSaved: (leadAtualizado) => {
+            const idx = state.leads.findIndex(l => l.id === id);
+            if (idx !== -1) state.leads[idx] = leadAtualizado;
+            rerenderLeadsSection();
+        },
+        onClose: () => rerenderLeadsSection()
+    });
+}
+
+async function handleDeletarLead({ id }) {
+    const lead = state.leads.find(l => l.id === id);
+    if (!lead) return;
+    
+    if (!confirm(`Tem certeza que deseja excluir o lead "${lead.nome}"?\n\nEsta ação não pode ser desfeita.`)) return;
+    
+    try {
+        await deletarLead(id);
+        state.leads = state.leads.filter(l => l.id !== id);
+        rerenderLeadsSection();
+        mostrarToast('Lead excluído');
+    } catch (err) {
+        alert(`Erro ao excluir lead: ${err.message}`);
+    }
+}
+
 async function handleRoleChange(sel) {
     const { id, current } = sel.dataset;
     const novoRole = sel.value;
@@ -455,23 +505,53 @@ async function handleToggleAtivo(btn) {
     }
 }
 
+// Debounce para prevenir múltiplas tentativas rápidas
+let ultimaTentativaCriacaoUsuario = 0;
+
 async function handleCriarUsuario(e) {
     e.preventDefault();
     if (state.salvandoUsuario) return;
+    
+    // Previne múltiplas tentativas em menos de 2 segundos
+    const agora = Date.now();
+    if (agora - ultimaTentativaCriacaoUsuario < 2000) {
+        state.erroNovoUsuario = '⚠️ Aguarde alguns segundos antes de tentar novamente.';
+        rerenderModalUsuario();
+        return;
+    }
+    ultimaTentativaCriacaoUsuario = agora;
+    
     const nome     = _container.querySelector('#nu-nome').value.trim();
     const email    = _container.querySelector('#nu-email').value.trim();
     const password = _container.querySelector('#nu-senha').value;
     const role     = _container.querySelector('#nu-role').value;
+    
+    if (!nome || !email || !password) {
+        state.erroNovoUsuario = '⚠️ Preencha todos os campos obrigatórios.';
+        rerenderModalUsuario();
+        return;
+    }
+    
     state.salvandoUsuario = true; state.erroNovoUsuario = '';
     rerenderModalUsuario();
     try {
         await createUser({ nome, email, password, role });
         state.modalNovoUsuario = false; state.salvandoUsuario = false;
         await loadUsuarios();
+        // Mostra toast de sucesso
+        mostrarToast('✅ Usuário criado com sucesso!', 'success');
     } catch (err) {
         state.salvandoUsuario = false; state.erroNovoUsuario = err.message;
         rerenderModalUsuario();
     }
+}
+
+function mostrarToast(mensagem, tipo = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast-${tipo}`;
+    toast.textContent = mensagem;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
 }
 
 /* ─── Loaders ────────────────────────────────────────────── */

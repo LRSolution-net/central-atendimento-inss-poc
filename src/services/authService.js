@@ -49,7 +49,20 @@ export async function createUser({ nome, email, password, role }) {
         options: { data: { nome, role } },
     });
 
-    if (error) throw new Error(`Erro ao criar usuário: ${error.message}`);
+    if (error) {
+        // Tratamento específico para rate limit
+        if (error.message.includes('rate limit') || error.message.includes('Email rate limit exceeded')) {
+            throw new Error(
+                '⏱️ Limite de criação de usuários excedido. Aguarde 1 minuto e tente novamente. '
+                + 'O Supabase limita criação de usuários para prevenir spam.'
+            );
+        }
+        // Tratamento para email já existente
+        if (error.message.includes('already registered') || error.message.includes('already been registered')) {
+            throw new Error('📧 Este e-mail já está cadastrado no sistema.');
+        }
+        throw new Error(`Erro ao criar usuário: ${error.message}`);
+    }
     if (!data.user) throw new Error(
         'Usuário não foi criado. No painel do Supabase, vá em Authentication → Settings e desative "Confirm email".'
     );

@@ -10,6 +10,7 @@ create table if not exists public.leads (
   whatsapp      text        not null,
   cidade        text        not null,
   idade         int         not null,
+  sexo          text        not null,
   contribuicao_anos int     not null,
   beneficio     text        not null,
   situacao      text        not null,
@@ -20,11 +21,15 @@ create table if not exists public.leads (
   consentimento boolean     not null default false
 );
 
+-- Índice único para evitar duplicatas de WhatsApp
+create unique index if not exists leads_whatsapp_unique_idx on public.leads(whatsapp);
+
 -- Habilita RLS
 alter table public.leads enable row level security;
 
 -- Remove politicas antigas se existirem
 drop policy if exists leads_insert_anon on public.leads;
+drop policy if exists leads_select_anon on public.leads;
 
 -- Permite apenas INSERT pelo usuario anonimo com consentimento
 create policy leads_insert_anon
@@ -44,3 +49,7 @@ create policy leads_select_anon
 grant usage  on schema public to anon;
 grant insert on public.leads to anon;
 grant select on public.leads to anon;
+
+-- IMPORTANTE: Se a tabela já existe, execute isto para adicionar campos novos:
+-- ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS sexo text;
+-- CREATE UNIQUE INDEX IF NOT EXISTS leads_whatsapp_unique_idx ON public.leads(whatsapp);

@@ -25,12 +25,16 @@ function scoreByContribuicao(contribuicaoAnos) {
     return 6;
 }
 
-function scoreByIdade(idade) {
-    if (idade >= 60) {
+function scoreByIdade(idade, sexo) {
+    // Mulheres têm critérios de idade diferentes para aposentadoria
+    const idadeMinima = sexo === 'feminino' ? 57 : 62;
+    const idadeMeia = sexo === 'feminino' ? 40 : 45;
+    
+    if (idade >= idadeMinima) {
         return 18;
     }
 
-    if (idade >= 45) {
+    if (idade >= idadeMeia) {
         return 11;
     }
 
@@ -49,11 +53,11 @@ function classificar(score) {
     return 'Baixa';
 }
 
-export function avaliarTriagem({ beneficio, situacao, idade, contribuicao_anos }) {
+export function avaliarTriagem({ beneficio, situacao, idade, sexo, contribuicao_anos }) {
     const score =
         (PESO_BENEFICIO[beneficio] || 8) +
         (PESO_SITUACAO[situacao] || 8) +
-        scoreByIdade(idade) +
+        scoreByIdade(idade, sexo) +
         scoreByContribuicao(contribuicao_anos);
 
     const classificacao = classificar(score);

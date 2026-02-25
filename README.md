@@ -52,6 +52,47 @@ VITE_WHATSAPP_NUMBER=5511999999999
 npm run dev
 ```
 
+## 📱 Integração com WhatsApp
+
+O sistema oferece **3 opções** de integração com WhatsApp:
+
+### 🔥 Opção 1: Meta WhatsApp Business API (RECOMENDADO)
+
+- ✅ **GRÁTIS**: 1000 conversas/mês
+- ✅ **100% Automático**: Envia direto do sistema sem abrir navegador
+- ✅ **Já implementado**: Edge Function pronta
+- 📖 **[Ver guia completo de configuração →](CONFIGURAR_WHATSAPP.md)**
+
+Configure no `.env`:
+```bash
+VITE_META_WA_ENABLED=true
+```
+
+E adicione os secrets no Supabase (Edge Functions → Secrets):
+```bash
+META_WA_TOKEN=seu_token
+META_WA_PHONE_ID=seu_phone_id
+```
+
+### ⚡ Opção 2: Evolution API (Self-hosted)
+
+Para quem já tem Evolution API rodando:
+
+```bash
+VITE_EVOLUTION_API_URL=https://sua-api.com
+VITE_EVOLUTION_API_KEY=sua_key
+VITE_EVOLUTION_INSTANCE=instancia
+```
+
+### 📲 Opção 3: WhatsApp Web (Manual)
+
+Sem configuração! Abre popup lado a lado:
+- Modal fica à esquerda
+- WhatsApp Web abre à direita
+- Mensagem já vem pré-preenchida
+
+---
+
 ## Configuração do Supabase
 
 1. Crie um projeto no Supabase.
